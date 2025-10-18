@@ -8,8 +8,7 @@ config = {
     'num_heads': 8,
     'd_ff': 2048, # 4 * d_model
     'num_learnable_queries': 8, # Number of special query tokens
-    'dropout_attn_xp': 0.3,  # Dropout for standard self-attention
-    'dropout_attn_lqp': 0.1, # Higher dropout for attention involving queries
+    'dropout': 0.2,  # Dropout for standard self-attention
     'dropout_mlp': 0.1,
     'dropout_embed': 0.1,
 }

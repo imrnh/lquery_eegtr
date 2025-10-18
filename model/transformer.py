@@ -12,7 +12,7 @@ class Transformer(nn.Module):
     """
     def __init__(self, output_dim, model_embed_dim, num_layers, num_heads, d_ff,
                   num_learnable_queries,
-                 dropout_attn_xp, dropout_attn_lqp, dropout_mlp, dropout_embed):
+                 dropout, dropout_mlp, dropout_embed):
         super().__init__()
         self.model_embed_dim = model_embed_dim
         self.num_learnable_queries = num_learnable_queries
@@ -29,9 +29,7 @@ class Transformer(nn.Module):
                 model_embed_dim=model_embed_dim,
                 num_heads=num_heads,
                 d_ff=d_ff,
-                dropout_attn=0.0, # Placeholder, not used in custom MHA
-                dropout_attn_xp=dropout_attn_xp,
-                dropout_attn_lqp=dropout_attn_lqp,
+                dropout=dropout,
                 dropout_mlp=dropout_mlp
             ) for _ in range(num_layers)
         ])

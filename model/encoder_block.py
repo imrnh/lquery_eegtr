@@ -10,7 +10,7 @@ class EncoderBlock(nn.Module):
     Network (MLP). It includes layer normalization before each sub-layer and
     residual connections after each sub-layer.
     """
-    def __init__(self, model_embed_dim, num_heads, d_ff, dropout_attn, dropout_attn_xp, dropout_attn_lqp, dropout_mlp):
+    def __init__(self, model_embed_dim, num_heads, d_ff, dropout, dropout_mlp):
         """
         Args:
             model_embed_dim (int): The dimension of the input, attention, and MLP.
@@ -28,8 +28,7 @@ class EncoderBlock(nn.Module):
         self.attention = MultiHeadAttention(
             d_in=model_embed_dim,
             d_out=model_embed_dim,
-            dropout_xp=dropout_attn_xp,
-            dropout_lqp=dropout_attn_lqp,
+            dropout=dropout,
             num_heads=num_heads
         )
         self.mlp = MLP(model_embed_dim, d_ff, dropout_mlp)
