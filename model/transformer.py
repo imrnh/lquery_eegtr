@@ -50,13 +50,7 @@ class Transformer(nn.Module):
             # Add learnable queries if layer index > 0
             if lix > 0 and self.num_learnable_queries > 0:
                 lq_expanded = self.learnable_queries.unsqueeze(1).expand(b, timestamps, -1, -1)  # (bsz, timestamps, self.num_learnable_queries, model_embed_dim) 
-
-                print(f"Shape of X: {x.shape}")
-                print(f"Shape of LQ: {lq_expanded.shape}")
-                
                 x = torch.cat([x, lq_expanded], dim=2)
-
-                print(f"Modified x shape: {x.shape}")
 
             # Pass to encoder.
             x = layer(x, num_x_tokens=num_x_tokens)

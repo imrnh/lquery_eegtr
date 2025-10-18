@@ -5,7 +5,7 @@ from config import config, device
 
 
 # Create a dummy input batch
-batch_size, timestamp, num_channels, embed_dim = 2, 5, 3, config['model_embed_dim']
+batch_size, timestamp, num_channels, embed_dim = 1, 99, 26, config['model_embed_dim']
 eeg_signal = torch.rand((batch_size, timestamp, num_channels, embed_dim)).to(device) # (b, timestamps, num_channels, embed_dim)
 
 
