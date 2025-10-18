@@ -10,29 +10,23 @@ class Transformer(nn.Module):
     and a final head for projecting to the vocabulary size, making it suitable
     for language modeling tasks.
     """
-    def __init__(self, vocab_size, d_model, num_layers, num_heads, d_ff,
-                 context_length, num_learnable_queries,
+    def __init__(self, output_dim, model_embed_dim, num_layers, num_heads, d_ff,
+                  num_learnable_queries,
                  dropout_attn_xp, dropout_attn_lqp, dropout_mlp, dropout_embed):
         super().__init__()
-        self.d_model = d_model
-        self.context_length = context_length
+        self.model_embed_dim = model_embed_dim
         self.num_learnable_queries = num_learnable_queries
 
-        # --- Embedding Layers ---
-        self.token_embedding = nn.Embedding(vocab_size, d_model)
-        self.pos_embedding = nn.Embedding(context_length, d_model)
-        self.embed_dropout = nn.Dropout(dropout_embed)
-
-        # --- Learnable Query Tokens (optional) ---
+        # Learnable Query Tokens 
         if self.num_learnable_queries > 0:
             self.learnable_queries = nn.Parameter(
-                torch.randn(1, self.num_learnable_queries, d_model)
+                torch.randn(1, self.num_learnable_queries, model_embed_dim)
             )
 
-        # --- Encoder Stack ---
+        # Encoder Stack
         self.layers = nn.ModuleList([
             EncoderBlock(
-                d_model=d_model,
+                model_embed_dim=model_embed_dim,
                 num_heads=num_heads,
                 d_ff=d_ff,
                 dropout_attn=0.0, # Placeholder, not used in custom MHA
@@ -42,53 +36,35 @@ class Transformer(nn.Module):
             ) for _ in range(num_layers)
         ])
 
-        # --- Output Head ---
-        self.final_norm = nn.LayerNorm(d_model)
-        self.lm_head = nn.Linear(d_model, vocab_size)
-        
-        # Tie the weights of the token embedding and the final linear layer
-        self.token_embedding.weight = self.lm_head.weight
+        # Output Head
+        self.final_norm = nn.LayerNorm(model_embed_dim)
+        self.lm_head = nn.Linear(model_embed_dim, output_dim)
 
-    def forward(self, idx):
-        """
-        Forward pass of the Transformer model.
+    def forward(self, x):
+        b, timestamps, num_channels, embed_dim = x.shape
 
-        Args:
-            idx (torch.Tensor): Input tensor of token indices, shape (batch_size, seq_len).
+        # pass input to the encoder. No additional processing.
+        # lq = torch.rand((bsz, (num_channels), embed_dim))
+       
+        for lix, layer in enumerate(self.layers):
+            num_x_tokens = x.shape[1] # number of original tokens before adding learnable queries.
 
-        Returns:
-            torch.Tensor: Logits over the vocabulary, shape (batch_size, seq_len, vocab_size).
-        """
-        b, t = idx.shape
-        assert t <= self.context_length, \
-            f"Input sequence length ({t}) exceeds model's context length ({self.context_length})"
-            
-        # --- 1. Get Embeddings ---
-        tok_embed = self.token_embedding(idx)
-        pos_ids = torch.arange(t, device=idx.device)
-        pos_embed = self.pos_embedding(pos_ids)
-        x = self.embed_dropout(tok_embed + pos_embed)
-        num_x_tokens = x.shape[1]
+            # Add learnable queries if layer index > 0
+            if lix > 0 and self.num_learnable_queries > 0:
+                lq_expanded = self.learnable_queries.unsqueeze(1).expand(b, timestamps, -1, -1)  # (bsz, timestamps, self.num_learnable_queries, model_embed_dim) 
 
-        # --- 2. Concatenate with Learnable Queries (if any) ---
-        if self.num_learnable_queries > 0:
-            # Expand queries to match the batch size
-            lq = self.learnable_queries.expand(b, -1, -1)
-            x = torch.cat([x, lq], dim=1)
+                print(f"Shape of X: {x.shape}")
+                print(f"Shape of LQ: {lq_expanded.shape}")
+                
+                x = torch.cat([x, lq_expanded], dim=2)
 
-        # --- 3. Pass through Encoder Stack ---
-        for layer in self.layers:
+                print(f"Modified x shape: {x.shape}")
+
+            # Pass to encoder.
             x = layer(x, num_x_tokens=num_x_tokens)
 
-        # --- 4. Process Output ---
-        # Normalize the full output
+
         processed_output = self.final_norm(x)
+        embeddings = self.lm_head(processed_output)
 
-        # For language modeling, we only care about the outputs corresponding
-        # to the original tokens, not the learnable queries.
-        processed_tokens = processed_output[:, :num_x_tokens, :]
-
-        # --- 5. Get Logits ---
-        logits = self.lm_head(processed_tokens)
-
-        return logits
+        return embeddings

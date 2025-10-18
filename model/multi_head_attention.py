@@ -33,24 +33,24 @@ class MultiHeadAttention(nn.Module):
 
         Args:
             x (torch.Tensor): The combined input tensor of shape
-                              (batch_size, total_tokens, embedding_dim).
+                              (batch_size, num_tokens, embedding_dim).
                               It's assumed to be a concatenation of original
                               tokens and learnable queries.
             num_x_tokens (int): The number of original tokens in the input tensor.
                                 This is used to distinguish them from the
                                 learnable queries for applying differential dropout.
         """
-        b, total_tokens, d_in = x.shape
-        num_lq_tokens = total_tokens - num_x_tokens
+        b, timestamps, num_tokens, d_in = x.shape
+        num_lq_tokens = num_tokens - num_x_tokens
 
         keys = self.W_key(x)
         queries = self.W_query(x)
         values = self.W_value(x)
 
         # Reshape and transpose for multi-head processing
-        keys = keys.view(b, total_tokens, self.num_heads, self.head_dim).transpose(1, 2)
-        queries = queries.view(b, total_tokens, self.num_heads, self.head_dim).transpose(1, 2)
-        values = values.view(b, total_tokens, self.num_heads, self.head_dim).transpose(1, 2)
+        keys = keys.view(b, timestamps,  num_tokens, self.num_heads, self.head_dim).transpose(2, 3)
+        queries = queries.view(b, timestamps, num_tokens, self.num_heads, self.head_dim).transpose(2, 3)
+        values = values.view(b, timestamps, num_tokens, self.num_heads, self.head_dim).transpose(2, 3)
         
         # --- Attention Calculation ---
         attn_scores = queries @ keys.transpose(-1, -2)
@@ -87,8 +87,8 @@ class MultiHeadAttention(nn.Module):
                 
                 # Calculate the single combined scaling factor
                 n_xx = num_x_tokens * num_x_tokens
-                n_lq_related = total_tokens**2 - n_xx
-                n_total = total_tokens**2
+                n_lq_related = num_tokens**2 - n_xx
+                n_total = num_tokens**2
                 
                 expected_total_kept = (n_xx * keep_p_x) + (n_lq_related * keep_p_lq)
                 
@@ -100,9 +100,8 @@ class MultiHeadAttention(nn.Module):
             else: # Standard dropout if no learnable queries exist
                 attn_weights = F.dropout(attn_weights, p=self.dropout_p_x, training=self.training)
         
-        # --- Context Vector Calculation ---
-        context_vec = (attn_weights @ values).transpose(1, 2)
-        context_vec = context_vec.contiguous().view(b, total_tokens, self.d_out)
+        context_vec = (attn_weights @ values).transpose(2, 3)
+        context_vec = context_vec.contiguous().view(b, timestamps, num_tokens, self.d_out)
         context_vec = self.out_proj(context_vec)
         
         return context_vec

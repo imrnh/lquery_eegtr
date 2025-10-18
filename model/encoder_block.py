@@ -10,10 +10,10 @@ class EncoderBlock(nn.Module):
     Network (MLP). It includes layer normalization before each sub-layer and
     residual connections after each sub-layer.
     """
-    def __init__(self, d_model, num_heads, d_ff, dropout_attn, dropout_attn_xp, dropout_attn_lqp, dropout_mlp):
+    def __init__(self, model_embed_dim, num_heads, d_ff, dropout_attn, dropout_attn_xp, dropout_attn_lqp, dropout_mlp):
         """
         Args:
-            d_model (int): The dimension of the input, attention, and MLP.
+            model_embed_dim (int): The dimension of the input, attention, and MLP.
             num_heads (int): The number of attention heads.
             d_ff (int): The dimension of the MLP's hidden layer.
             dropout_attn (float): Dropout for the final attention projection.
@@ -23,23 +23,24 @@ class EncoderBlock(nn.Module):
             dropout_mlp (float): Dropout for the MLP layer.
         """
         super().__init__()
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
+        self.norm1 = nn.LayerNorm(model_embed_dim)
+        self.norm2 = nn.LayerNorm(model_embed_dim)
         self.attention = MultiHeadAttention(
-            d_in=d_model,
-            d_out=d_model,
+            d_in=model_embed_dim,
+            d_out=model_embed_dim,
             dropout_xp=dropout_attn_xp,
             dropout_lqp=dropout_attn_lqp,
             num_heads=num_heads
         )
-        self.mlp = MLP(d_model, d_ff, dropout_mlp)
+        self.mlp = MLP(model_embed_dim, d_ff, dropout_mlp)
+        
 
     def forward(self, x, num_x_tokens):
         """
         Forward pass for the Encoder Block.
 
         Args:
-            x (torch.Tensor): The input tensor of shape (batch_size, total_tokens, d_model).
+            x (torch.Tensor): The input tensor of shape (batch_size, total_tokens, model_embed_dim).
             num_x_tokens (int): The number of original tokens, passed to the attention layer.
         """
         # --- Attention Sub-layer with Residual Connection ---
