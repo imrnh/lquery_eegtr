@@ -53,7 +53,7 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')  # requires log_probs input
 scaler = GradScaler(device=device)
 train(
     model=model,
-    spectral_conv=freq_bin_conv,
+    freq_conv=freq_bin_conv,
     dataloader=dataloader,
     val_dataloader=val_dataloader,
     optimizer=optimizer,
@@ -65,5 +65,3 @@ train(
     checkpoint_path="checkpoint.pt",
     best_models_dir="model_checkpoints"
 )
-
-print("Training Finished!...")
