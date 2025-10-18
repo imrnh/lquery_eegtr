@@ -15,7 +15,8 @@ hyperparams = SimpleNamespace(
     pin_memory=True,
     persistent_workers=True,
     prefetch_factor=2,
-    learning_rate=1e-3
+    learning_rate=1e-3,
+    num_epochs = 10,
 )
 
 
@@ -43,6 +44,7 @@ optimizer = torch.optim.AdamW(list(model.parameters()) + list(freq_bin_conv.para
 loss_fn = torch.nn.CrossEntropyLoss()
 
 # Training loop
-for epoch in range(config['num_epochs']):
+for epoch in range(hyperparams.num_epochs):
     for batch in dataloader:
         pass
+
