@@ -84,3 +84,23 @@ def maintain_best_models(best_models, val_loss, save_path, max_models=5):
             print(f"Removed old checkpoint: {worst[1]}")
         except OSError:
             pass
+
+
+
+"""
+    Read train, test, vall folders.
+"""
+
+def read_directory_mapping(filename="lib/directory_mapping.txt"):
+    dirs = {"train": [], "val": [], "test": []}
+    current = None
+    with open(filename, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                current = line[1:-1]
+            elif current:
+                dirs[current].append(line)
+    return dirs["train"], dirs["val"], dirs["test"]
