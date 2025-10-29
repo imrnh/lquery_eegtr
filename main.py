@@ -53,7 +53,7 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')  # requires log_probs input
 scaler = GradScaler(device=device)
 train(
     model=model,
-    freq_conv=freq_bin_conv,
+    freq_bin_conv=freq_bin_conv,
     dataloader=dataloader,
     val_dataloader=val_dataloader,
     optimizer=optimizer,

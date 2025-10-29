@@ -8,7 +8,7 @@ from utils import get_vote_probability, load_validation_history, initialize_best
 
 
 
-def train_one_step(batch, model, freq_conv, optimizer, scaler, kl_loss, device):
+def train_one_step(batch, model, freq_bin_conv, optimizer, scaler, kl_loss, device):
     """Execute one training step."""
     spectrograms, labels, votes = batch
     
@@ -18,8 +18,8 @@ def train_one_step(batch, model, freq_conv, optimizer, scaler, kl_loss, device):
     optimizer.zero_grad(set_to_none=True)
     
     with autocast("cuda", dtype=torch.float16):
-        Xf, Xt = freq_conv(spectrograms)
-        out = model(Xt, Xf)
+        x = freq_bin_conv(spectrograms)
+        out = model(x)
         log_probs = nn.functional.log_softmax(out, dim=-1)
         loss = kl_loss(log_probs, votes)
     
@@ -30,10 +30,10 @@ def train_one_step(batch, model, freq_conv, optimizer, scaler, kl_loss, device):
     return loss.item()
 
 
-def evaluate(model, freq_conv, val_dataloader, kl_loss, device):
+def evaluate(model, freq_bin_conv, val_dataloader, kl_loss, device):
     """Run validation and return average loss."""
     model.eval()
-    freq_conv.eval()
+    freq_bin_conv.eval()
     val_loss = 0.0
     
     with torch.no_grad():
@@ -43,20 +43,20 @@ def evaluate(model, freq_conv, val_dataloader, kl_loss, device):
             val_votes = get_vote_probability(val_votes).to(device, dtype=torch.float32, non_blocking=True)
             
             with autocast(device_type="cuda", dtype=torch.float16):
-                x = freq_conv(val_spectrograms)
+                x = freq_bin_conv(val_spectrograms)
                 val_out = model(x)
                 val_log_probs = nn.functional.log_softmax(val_out, dim=-1)
                 val_loss += kl_loss(val_log_probs, val_votes).item()
     
     model.train()
-    freq_conv.train()
+    freq_bin_conv.train()
     
     return val_loss / len(val_dataloader)
 
 
 def train(
     model,
-    freq_conv,
+    freq_bin_conv,
     dataloader,
     val_dataloader,
     optimizer,
@@ -85,7 +85,7 @@ def train(
     
     for epoch in range(start_epoch, config.num_epochs):
         model.train()
-        freq_conv.train()
+        freq_bin_conv.train()
         epoch_loss = 0.0
         
         t = tqdm(dataloader, desc=f"Epoch {epoch+1}")
@@ -93,23 +93,23 @@ def train(
             config.step += 1
             
             # Training step
-            loss = train_one_step(batch, model, freq_conv, optimizer, scaler, kl_loss, device)
+            loss = train_one_step(batch, model, freq_bin_conv, optimizer, scaler, kl_loss, device)
             epoch_loss += loss
             t.set_postfix({'KL_loss': loss})
             
             # Save checkpoint periodically
             if config.step % config.training_state_checkpoint_frequency == 0:
-                save_checkpoint(checkpoint_path, epoch, config.step, model, freq_conv, optimizer, scaler)
+                save_checkpoint(checkpoint_path, epoch, config.step, model, freq_bin_conv, optimizer, scaler)
                 print(f"\n[Step {config.step}] Checkpoint saved to {checkpoint_path}")
             
             # Evaluation
             if config.step % config.eval_interval == 0:
-                val_loss = evaluate(model, freq_conv, val_dataloader, kl_loss, device)
+                val_loss = evaluate(model, freq_bin_conv, val_dataloader, kl_loss, device)
                 print(f"\n[Step {config.step}] Validation loss: {val_loss:.4f}")
                 
                 # Save validation checkpoint
                 save_path = os.path.join(best_models_dir, f"model_step{config.step}_valloss{val_loss:.4f}.pt")
-                save_checkpoint(save_path, epoch, config.step, model, freq_conv, optimizer, scaler, val_loss)
+                save_checkpoint(save_path, epoch, config.step, model, freq_bin_conv, optimizer, scaler, val_loss)
                 
                 # Log and maintain best models
                 log_validation_loss(val_log_file, config.step, val_loss, save_path)
