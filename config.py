@@ -1,5 +1,5 @@
 import torch
-
+from utils import read_directory_mapping
 
 config = {
     'output_dim': 6,
@@ -18,5 +18,6 @@ config = {
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-train_dir = ["data/train"]
-val_dir = ["data/val"]
+
+
+train_dir, val_dir, test_dir = read_directory_mapping()
