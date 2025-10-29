@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.amp import autocast
 from tqdm.auto import tqdm
-
+from torch.utils.data import Subset, DataLoader
 from utils import get_vote_probability, load_validation_history, initialize_best_models_heap, log_validation_loss, save_checkpoint, maintain_best_models
 
 
@@ -30,14 +30,30 @@ def train_one_step(batch, model, freq_bin_conv, optimizer, scaler, kl_loss, devi
     return loss.item()
 
 
-def evaluate(model, freq_bin_conv, val_dataloader, kl_loss, device):
+def evaluate(model, freq_bin_conv, val_dataloader, kl_loss, device, num_samples=200):
     """Run validation and return average loss."""
     model.eval()
     freq_bin_conv.eval()
     val_loss = 0.0
+
+    # Get the original dataset from the validation dataloader
+    original_dataset = val_dataloader.dataset
+    dataset_size = len(original_dataset)
+    num_eval_samples = min(num_samples, dataset_size)
+    random_indices = torch.randperm(dataset_size)[:num_eval_samples].tolist()
+    
+    # Create a subset dataset using the random indices
+    subset_dataset = Subset(original_dataset, random_indices)
+    subset_dataloader = DataLoader( # Create a temporary DataLoader for this random subset
+        subset_dataset,
+        batch_size=val_dataloader.batch_size,
+        shuffle=False, # No need to shuffle, indices are already random
+        num_workers=val_dataloader.num_workers,
+        pin_memory=val_dataloader.pin_memory
+    )
     
     with torch.no_grad():
-        for val_batch in val_dataloader:
+        for val_batch in subset_dataloader:
             val_spectrograms, val_labels, val_votes = val_batch
             val_spectrograms = val_spectrograms.to(device, dtype=torch.float32, non_blocking=True)
             val_votes = get_vote_probability(val_votes).to(device, dtype=torch.float32, non_blocking=True)
@@ -51,8 +67,15 @@ def evaluate(model, freq_bin_conv, val_dataloader, kl_loss, device):
     model.train()
     freq_bin_conv.train()
     
-    return val_loss / len(val_dataloader)
+    return val_loss / len(subset_dataloader)
 
+
+
+
+""" 
+    Global Training Function. 
+    Takes the whole dataloader and then train the model using train_one_step.
+"""
 
 def train(
     model,
@@ -87,6 +110,7 @@ def train(
         model.train()
         freq_bin_conv.train()
         epoch_loss = 0.0
+        
         
         t = tqdm(dataloader, desc=f"Epoch {epoch+1}")
         for batch in t:
