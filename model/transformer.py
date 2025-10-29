@@ -37,10 +37,10 @@ class Transformer(nn.Module):
 
         # Output Head
         self.final_norm = nn.LayerNorm(model_embed_dim)
-        
+
         # self.lm_head = nn.Linear(timestamp * (eeg_channels + self.total_learnable_queries_in_model) * model_embed_dim, output_dim)
         # Calculate the input dimension for the final MLP head. This is the size of the flattened output from the encoder stack
-        in_features_head = timestamp * (eeg_channels + self.total_learnable_queries_in_model) * model_embed_dim
+        in_features_head = (eeg_channels + self.total_learnable_queries_in_model) * model_embed_dim        
         
         # Define intermediate hidden dimensions for the MLP head
         # These are examples; you can tune these hyperparameters
@@ -75,7 +75,11 @@ class Transformer(nn.Module):
 
 
         processed_output = self.final_norm(x)          # (b, timestamp, (eeg_channel + total_learnable_queries_in_model), model_embed_dim)
-        flattened = processed_output.view(processed_output.size(0), -1)  # (b, timestamp * (eeg_channel + total_learnable_queries_in_model) * model_embed_dim)
-        embeddings = self.lm_head(flattened)           # (b, output_dim)
-
+        
+        # Take the mean across the timestamp dimension (dim=1)
+        mean_output = processed_output.mean(dim=1)      # (b, (eeg_channel + total_lq), model_embed_dim)
+        flattened = mean_output.view(mean_output.size(0), -1)   # (b, (eeg_channel + total_lq) * model_embed_dim)
+        embeddings = self.lm_head(flattened)            # (b, output_dim)
+        
+        
         return embeddings
