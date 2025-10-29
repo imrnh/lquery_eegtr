@@ -12,10 +12,11 @@ class Transformer(nn.Module):
     """
     def __init__(self, output_dim, model_embed_dim, num_layers, num_heads, d_ff,
                   num_learnable_queries,
-                 dropout, dropout_mlp, dropout_embed):
+                 dropout, dropout_mlp, dropout_embed, eeg_channels, timestamp):
         super().__init__()
         self.model_embed_dim = model_embed_dim
         self.num_learnable_queries = num_learnable_queries
+        self.total_learnable_queries_in_model = num_learnable_queries * (num_layers - 1)  # as we added no LQ to the first layer.
 
         # Learnable Query Tokens 
         if self.num_learnable_queries > 0:
@@ -36,7 +37,24 @@ class Transformer(nn.Module):
 
         # Output Head
         self.final_norm = nn.LayerNorm(model_embed_dim)
-        self.lm_head = nn.Linear(model_embed_dim, output_dim)
+        
+        # self.lm_head = nn.Linear(timestamp * (eeg_channels + self.total_learnable_queries_in_model) * model_embed_dim, output_dim)
+        # Calculate the input dimension for the final MLP head. This is the size of the flattened output from the encoder stack
+        in_features_head = timestamp * (eeg_channels + self.total_learnable_queries_in_model) * model_embed_dim
+        
+        # Define intermediate hidden dimensions for the MLP head
+        # These are examples; you can tune these hyperparameters
+        # Replace the single nn.Linear with an nn.Sequential MLP
+        self.lm_head = nn.Sequential(
+            nn.Linear(in_features_head, 512),
+            nn.GELU(), # Using GELU, but nn.ReLU() is also a common choice
+            nn.Dropout(dropout_embed),
+            nn.Linear(512, 256),
+            nn.GELU(),
+            nn.Dropout(dropout_embed),
+            nn.Linear(256, output_dim)
+        )
+
 
     def forward(self, x):
         b, timestamps, num_channels, embed_dim = x.shape
@@ -56,7 +74,8 @@ class Transformer(nn.Module):
             x = layer(x, num_x_tokens=num_x_tokens)
 
 
-        processed_output = self.final_norm(x)
-        embeddings = self.lm_head(processed_output)
+        processed_output = self.final_norm(x)          # (b, timestamp, (eeg_channel + total_learnable_queries_in_model), model_embed_dim)
+        flattened = processed_output.view(processed_output.size(0), -1)  # (b, timestamp * (eeg_channel + total_learnable_queries_in_model) * model_embed_dim)
+        embeddings = self.lm_head(flattened)           # (b, output_dim)
 
         return embeddings

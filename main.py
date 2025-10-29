@@ -31,8 +31,8 @@ hyperparams = SimpleNamespace(
 
 
 # Data processor
-train_ds = EEGDataset(train_dir, metadata_file="lib/train_metadata.pkl")
-val_ds = EEGDataset(val_dir, metadata_file="lib/val_metadata.pkl")
+train_ds = EEGDataset(train_dir, metadata_file="lib/train_metadata_demo.pkl")
+val_ds = EEGDataset(val_dir, metadata_file="lib/val_metadata_demo.pkl")
 
 dataloader = DataLoader(train_ds, batch_size=hyperparams.batch_size, shuffle=True, num_workers=hyperparams.num_workers, pin_memory=True, persistent_workers=True, prefetch_factor=2)
 val_dataloader = DataLoader(val_ds, batch_size=hyperparams.batch_size, shuffle=True, num_workers=hyperparams.num_workers, pin_memory=True, persistent_workers=True, prefetch_factor=2)
