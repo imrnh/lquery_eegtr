@@ -4,7 +4,7 @@ import torch
 config = {
     'output_dim': 6,
     'model_embed_dim': 512,
-    'num_layers': 3,
+    'num_layers': 5,
     'num_heads': 8,
     'd_ff': 2048, # 4 * d_model
     'num_learnable_queries': 8, # Number of special query tokens
